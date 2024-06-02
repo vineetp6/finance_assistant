@@ -11,10 +11,9 @@ from scipy.optimize import minimize
 
 # Function to fetch stock data
 @st.cache_data(ttl=60*10)
-def get_stock_data(ticker):
-    stock = yf.Ticker(ticker)
-    hist = stock.history(period="5y")
-    return hist
+def get_stock_data(tickers):
+    data = yf.download(tickers, period="5y")
+    return data['Close']
 
 # Function to preprocess data
 def preprocess_data(data):
@@ -102,23 +101,23 @@ st.title("Financial Virtual Assistant")
 st.sidebar.header("User Input")
 
 # User inputs
-ticker = st.sidebar.text_input("Stock Ticker", value='AAPL')
+tickers = st.sidebar.text_input("Stock Tickers (comma-separated)", value='AAPL,MSFT,GOOG').split(',')
 investment_goal = st.sidebar.selectbox("Investment Goal", ["Growth", "Income", "Preservation"])
 risk_tolerance = st.sidebar.slider("Risk Tolerance", 1, 10, 5)
 
 # Display stock data
-st.header(f"Stock Data for {ticker}")
-stock_data = get_stock_data(ticker)
-st.line_chart(stock_data['Close'])
+st.header(f"Stock Data for {', '.join(tickers)}")
+stock_data = get_stock_data(tickers)
+st.line_chart(stock_data)
 
 # Preprocess data for models
-scaled_data, scaler = preprocess_data(stock_data['Close'].values.reshape(-1, 1))
+scaled_data, scaler = preprocess_data(stock_data[tickers[0]].values.reshape(-1, 1))
 
 # ARIMA prediction
 st.header("ARIMA Model Prediction")
-arima_model_fit = arima_model(stock_data['Close'])
+arima_model_fit = arima_model(stock_data[tickers[0]])
 arima_forecast = predict_arima(arima_model_fit, steps=30)
-st.write(f"ARIMA model predicts next 30 days: {arima_forecast}")
+st.write(f"ARIMA model predicts next 30 days for {tickers[0]}: {arima_forecast}")
 
 # LSTM prediction
 st.header("LSTM Model Prediction")
@@ -127,12 +126,13 @@ x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
 lstm_model = create_lstm_model((x_train.shape[1], 1))
 trained_lstm_model = train_lstm_model(lstm_model, x_train, y_train)
 lstm_forecast = predict_lstm(trained_lstm_model, scaled_data, scaler)
-st.write(f"LSTM model predicts next 30 days: {lstm_forecast}")
+st.write(f"LSTM model predicts next 30 days for {tickers[0]}: {lstm_forecast}")
 
 # MPT portfolio optimization
 st.header("Portfolio Optimization using MPT")
-mean_returns = stock_data['Close'].pct_change().mean()
-cov_matrix = stock_data['Close'].pct_change().cov()
+returns = stock_data.pct_change().dropna()
+mean_returns = returns.mean()
+cov_matrix = returns.cov()
 optimal_portfolio = optimize_portfolio(mean_returns, cov_matrix)
 st.write(f"Optimal portfolio: {optimal_portfolio}")
 
