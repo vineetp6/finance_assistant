@@ -1,3 +1,4 @@
+# Finance assistant - allow input of multiple stock ticker
 import streamlit as st
 import yfinance as yf
 import pandas as pd
